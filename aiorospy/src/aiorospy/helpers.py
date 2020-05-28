@@ -12,33 +12,31 @@ from async_generator import asynccontextmanager
 logger = logging.getLogger(__name__)
 
 
-def cancel_on_shutdown(task, loop=None):
-    loop = loop if loop is not None else asyncio.get_event_loop()
+def cancel_on_shutdown(task):
+    loop = asyncio.get_event_loop()
     rospy.on_shutdown(lambda: loop.call_soon_threadsafe(task.cancel))
 
 
-def cancel_on_exception(task, loop=None):
+def cancel_on_exception(task):
     def handler(loop, context):
         loop.default_exception_handler(context)
         if not task.cancelled():
             task.cancel()
 
-    loop = loop if loop is not None else asyncio.get_event_loop()
-    loop.set_exception_handler(handler)
+    asyncio.get_event_loop().set_exception_handler(handler)
 
 
 class ExceptionMonitor:
     """ Monitor exceptions in background tasks so they don't get ignored.
     """
 
-    def __init__(self, loop=None):
-        self._loop = loop if loop is not None else asyncio.get_event_loop()
+    def __init__(self):
         self._pending_tasks = set()
-        self._exception_q = janus.Queue(loop=self._loop)
 
     async def start(self):
         """ Monitor registered background tasks, and raise their exceptions.
         """
+        self._exception_q = janus.Queue()
         try:
             while True:
                 exc = await self._exception_q.async_q.get()
